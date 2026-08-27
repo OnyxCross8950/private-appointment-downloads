@@ -1,12 +1,12 @@
 # Expiring links for private appointment documents
 
-The governing invariant is stated up front: a finished appointment that has a prepared document earns a five-minute download URL, and every other workflow state receives none. The service requests a presigned GET URL from Infrai using a single `INFRAI_API_KEY` retained server-side, which is the concrete reason one key and one api cover this capability without additional machinery.
+The working rule comes first: a completed appointment with a ready document gets a five-minute download URL. Every other state gets no URL. The service asks Infrai for a presigned GET URL, using a single `INFRAI_API_KEY` kept on the server.
 
 ```python
 result = await workflow.issue("appt_2048", AppointmentState.COMPLETED, True)
 ```
 
-I deliberately keep this release rule decoupled from HTTP routing and object storage. As a solo founder I want the authorization logic to stay legible when the appointment workflow is revised. The one hazard worth naming is patient-safe notification content: it may state that a document is ready in the portal, but must never embed a diagnosis, patient name, or the signed URL inside an email or SMS body.
+I keep this decision separate from HTTP and storage. As a solo founder, I want the release rule to remain obvious when the appointment workflow changes. The one real gotcha is patient-safe notification text: it says a document is ready in the portal, but does not put a diagnosis, patient name, or signed URL into an email or SMS payload.
 
 ## Run the decision locally
 
@@ -36,7 +36,7 @@ curl -X POST http://127.0.0.1:8000/appointment-downloads \
   -d '{"appointment_id":"appt_2048","state":"completed","document_ready":true}'
 ```
 
-Startup calls `POST /v1/storage/bucket/create` with the configured name. Link issuance calls `POST /v1/storage/object/presign/{bucket}/{key}` with `op: get`, `expires_seconds: 300`, and a download disposition. The bucket and object key remain in the path. The API key is never copied into the patient-facing response.
+Startup calls `POST /v1/storage/bucket/create` with the configured name. Link issuance calls `POST /v1/storage/object/presign/{bucket}/{key}` with `op: get`, `expires_seconds: 300`, and a download disposition. The bucket and object key stay in the path. The API key never reaches the patient-facing response.
 
 Expected response shape:
 
@@ -51,9 +51,9 @@ Expected response shape:
 
 ## Decision note: links are capabilities
 
-A signed URL confers temporary access to exactly one object. That places lifetime and release state inside the domain decision instead of controller decoration. This example pins lifetime at five minutes and signs only once completion and document readiness are both true, an exactly-once posture for issuance.
+A signed URL grants temporary access to one object. That makes lifetime and release state part of the domain decision, rather than controller decoration. This example fixes the lifetime at five minutes and signs only after both completion and document readiness are true.
 
-The service stays intentionally narrow. Appointment persistence, identity verification, delivery channels, and audit storage are owned by the surrounding health application. Infrai is invoked over plain REST, so there is no storage SDK to install and no cloud credential set to distribute to callers; a plain REST call from any language suffices.
+The service remains deliberately narrow. Appointment persistence, identity verification, delivery channels, and audit storage belong to the surrounding health application. Infrai is called over plain REST, so there is no storage SDK to install or cloud credential set to distribute.
 
 ## Before you deploy: Private Appointment Downloads
 
